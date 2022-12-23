@@ -1,39 +1,55 @@
-//https://github.com/valarauca/xlsx-rs/blob/master/src/lib.rs
-use walkdir::WalkDir;
 use regex::RegexSet;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use walkdir::WalkDir;
 
 fn main() {
-    let pii = RegexSet::new(&[
-    r"name",
-    r"email",
-    r"birthday",
-    r"ssn",
-    r"credit",
-    r"card",
-    r"phone"
-    ]).unwrap();
+    let file_extensions = vec!["txt", "csv", "doc"];
+    let xml_extensions = vec!["docx", "xlsx"];
 
-    let folders: [&str; 4] = ["Users", "inetpub", "xampp", "ProgramData"];
+    let pii = RegexSet::new(&[
+        r"name", "email", "birthday", "ssn", "credit", "card", "phone",
+    ])
+    .unwrap();
+
+    let root = if cfg!(target_os = "windows") {
+        PathBuf::from(r"C:\")
+    } else {
+        PathBuf::from("/")
+    };
+    let folders = match std::env::args()
+        .skip(1)
+        .map(|path| {
+            let mut new_path = root.clone();
+            new_path.push(Path::new(&path));
+            new_path
+        })
+        .collect::<Vec<_>>() {
+        fs if fs.is_empty() => vec![root],
+        other => other
+    };
+
     for folder in folders {
-        let root = "C:\\";
-        let folder = root.to_owned() + folder;
-        if Path::new(&folder).is_dir() {
-            for file in WalkDir::new(folder).into_iter().filter_map(|file| file.ok()) {
-                let file_string = file.path().to_str().unwrap();
-                if file_string.ends_with(".txt") | file_string.ends_with(".csv") | file_string.ends_with(".doc") | file_string.ends_with(".docx"){
+        if folder.is_dir() {
+            for file in WalkDir::new(folder)
+                .into_iter()
+                .filter_map(|file| file.ok())
+            {
+                if file_extensions.iter().any(|ext| file.path().ends_with(ext)) {
+                    //find pii
                     let file_path = file.path().to_str().unwrap();
-                    let Ok(contents_string) = fs::read_to_string(file_path)
-                    else {
-                        continue;
+                    let contents_string = match fs::read_to_string(file_path) {
+                        Ok(contents) => contents,
+                        Err(e) => {
+                            eprintln!("Could not read file {}: {:?}", file_path.display(), e);
+                            continue;
+                        }
                     };
                     let contents_str = &contents_string[..];
                     if pii.is_match(contents_str) {
-                        println!("{:?}",file.path().display());
+                        println!("{:?}", file.path().display());
                     }
-                }
-                else if file_string.ends_with(".xlsx") | file_string.ends_with(".xls"){
+                } else if xml_extensions.iter().any(|ext| file.path().ends_with(ext)) {
                     continue; //EDIT THIS HERE STUFF
                 }
             }
