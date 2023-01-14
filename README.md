@@ -1,1 +1,2 @@
 # pii-scanner
+This project was made to scan a host for Personally Identifiable Information. We chose rust because it is fast, secure by default, and easily cross compatible between windows and linux. The resulting binary will recursively scan the specified folders for files containing PII. Currently, it will only scan files stored in plaintext; we hope to add the functionality to scan docx and xlsx files in the future
